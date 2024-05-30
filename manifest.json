@@ -3,7 +3,12 @@
     "name": "Display Title Extensions",
     "description": "Base Level Extension",
     "version": "1.0",
-    "permissions": ["tabs"],
+    "permissions": ["tabs","scripting",
+      "notifications"
+      ],
+      "host_permissions": [
+        "*://*.linkedin.com/"
+      ],
     "action": {
       "default_popup": "TitleDisplay/titleDisplay.html",
       "default_icon": "images/TProject.png"
