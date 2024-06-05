@@ -1,135 +1,105 @@
-let TitleElement = document.getElementById("DisplayTitleTask");
 let buttonElement = document.getElementById("DisplayBtn");
-let urlArray = [
-    'https://www.linkedin.com/in/williamhgates/',
-    'https://www.linkedin.com/in/sundarpichai/',
-    'https://www.linkedin.com/in/satyanadella/'
-];
-let currentindex = 0;
+let likeCountElement = document.getElementById('likeCount');
+let commentCountElement = document.getElementById('commentCount');
 
+buttonElement.disabled = true;
+
+function enableButton() {
+    const likeCount = likeCountElement.value;
+    const commentCount = commentCountElement.value;
+    if (parseInt(likeCount) > 0 && parseInt(commentCount) > 0) {
+        buttonElement.disabled = false;
+    } else {
+        buttonElement.disabled = true;
+    }
+}
+
+likeCountElement.addEventListener('input', enableButton);
+commentCountElement.addEventListener('input', enableButton);
 
 buttonElement.onclick = function() {
-    for(i=0; i<urlArray.length; i++) {
-    chrome.tabs.create({ url: urlArray[i] });
+    chrome.tabs.create({ url: 'https://www.linkedin.com/feed/' });
     chrome.tabs.query({ active: true, currentWindow: true }, callback);
-}}
+}
 
 function callback(tabs) {
     var currentTab = tabs[0];
     console.log('Current Tab:', currentTab);
+
     chrome.scripting.executeScript({
-        target: { tabId: currentTab.id },
-        func: () => {
-            let scrapedProfileData = {
-                name: "",
-                url:"",
-                about: "",
-                bio: "",
-                location: "",
-                followerCount: "",
-                connectionCount: ""
-            };
-
-            function grabData(currentindex, urlArray) {
-                console.log("Inside grabData");
-                alert("Inside grabData");
-
-                const anchors = document.querySelectorAll('a');
-                console.log("Anchors found:", anchors.length);
-
-                // Scrape name
-                if (!scrapedProfileData.name) {
-                    console.log("Scraping name...");
-                    for (let anchor of anchors) {
-                        if (anchor.getAttribute('href').endsWith('/overlay/about-this-profile/')) {
-                            let childH1 = anchor.querySelector('h1');
-                            if (childH1) {
-                                scrapedProfileData.name = childH1.innerText;
-                                alert("Name found: " + scrapedProfileData.name);
-                                console.log("Name found:", scrapedProfileData.name);
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                // Scrape location
-                if (!scrapedProfileData.location) {
-                    console.log("Scraping location...");
-                    for (let anchor of anchors) {
-                        if (anchor.getAttribute('href').endsWith('/overlay/contact-info/')) {
-                            let parentElement = anchor.parentElement;
-                            if (parentElement) {
-                                let siblingSpan = parentElement.previousElementSibling;
-                                if (siblingSpan && siblingSpan.tagName === 'SPAN') {
-                                    scrapedProfileData.location = siblingSpan.innerText;
-                                    alert("Location found: " + scrapedProfileData.location);
-                                    console.log("Location found:", scrapedProfileData.location);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Scrape follower count
-                if (!scrapedProfileData.followerCount) {
-                    console.log("Scraping follower count...");
-                    let followerListItems = document.querySelectorAll('li');
-                    for (let listItem of followerListItems) {
-                        if (listItem.innerText.includes("followers")) {
-                            let firstSpan = listItem.querySelector('span');
-                            if (firstSpan) {
-                                scrapedProfileData.followerCount = firstSpan.innerText.replace(/,/g, '');
-                                console.log("Follower count found:", scrapedProfileData.followerCount);
-                                alert("Follower count found: " + scrapedProfileData.followerCount);
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                // Check if all fields are populated
-                if (scrapedProfileData.name && scrapedProfileData.location && scrapedProfileData.followerCount) {
-                    console.log('All data collected:', scrapedProfileData);
-                    alert(`All data collected: Name: ${scrapedProfileData.name}, Location: ${scrapedProfileData.location}, Followers: ${scrapedProfileData.followerCount}`);
-                    scrapedProfileData.url = window.location.href;
-                    scrapedProfileData.about = "";
-                    scrapedProfileData.bio = "";
-                    scrapedProfileData.connectionCount="0",
-                    sendProfileData(scrapedProfileData);  // Send data to backend
-                } else {
-                    alert('Data collection incomplete. Retrying...');
-                    setTimeout(grabData, 5000);  // Retry after 5 seconds
-                }
-            }
-
-            function sendProfileData(userData) {
-                
-                alert('Sending User data: ' + JSON.stringify(userData));
-                fetch('http://localhost:3000/users', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(userData)
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok ' + response.statusText);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('User data saved successfully:', data);
-                })
-                .catch((error) => {
-                    console.error('Error saving User data:', error);
-                });
-            }
-
-            console.log("Initial grabData call with delay");
-            setTimeout(grabData, 5000);  // Initial call to grab data after 5 seconds
-        }
+        target: { tabId: tabs[0].id },
+        function: LikeAndComment,
+        args: [parseInt(likeCountElement.value), parseInt(commentCountElement.value)]
     });
+}
+
+function LikeAndComment(likeCount, commentCount) {
+    console.log("Inside LikeAndComment");
+
+    let Lc = 0;
+    let Cc = 0;
+
+    function LikePosts() {
+        let likeButtons = document.querySelectorAll('.feed-shared-social-action-bar__action-button .react-button__trigger');
+        
+        function likeNextPost() {
+            if (Lc < likeCount && Lc < likeButtons.length) {
+                likeButtons[Lc].click();
+                alert(`Liked post number: ${Lc + 1}`);
+                Lc++;
+                setTimeout(likeNextPost, 1000); // Delay between likes
+            } else if (Lc >= likeCount) {
+                alert('Finished liking posts');
+                setTimeout(CommentPosts, 1000); // Start commenting after finishing likes
+            } else {
+                console.error('Not enough posts to like');
+            }
+        }
+        
+        likeNextPost();
+    }
+
+    function CommentPosts() {
+        alert("in the comment section")
+        let commentButtons = document.querySelectorAll('.artdeco-button artdeco-button--muted artdeco-button--4 artdeco-button--tertiary ember-view social-actions-button comment-button flex-wrap ');
+        alert("what is in the commentButton" +commentButtons);
+        
+        function commentNextPost() {
+            if (Cc < commentCount && Cc < commentButtons.length) {
+                let commentBtn = commentButtons[Cc];
+                alert(commentBtn);
+                commentBtn.click();
+
+                // Wait a moment to allow the comment box to appear
+                setTimeout(() => {
+                    let commentBoxes = document.querySelectorAll('.feed-shared-social-actions .comments-comment-box__content .ql-editor p');
+                    alert("comment box" + commentBoxes);
+                    if (commentBoxes[Cc]) {
+                        commentBoxes[Cc].textContent = "CFBR"; // Use textContent to set the text
+                        let postButtons = document.querySelectorAll('.feed-shared-social-actions .comments-comment-box__form button[type="submit"]');
+                        if (postButtons[Cc]) {
+                            postButtons[Cc].click();
+                            alert(`Commented on post number: ${Cc + 1}`);
+                            Cc++;
+                            setTimeout(commentNextPost, 1000); // Delay between comments
+                        } else {
+                            console.error('Post button not found for comment');
+                        }
+                    } else {
+                        console.error('Comment box not found');
+                    }
+                }, 1000); // Adjust the delay as necessary
+            } else if (Cc >= commentCount) {
+                alert('Finished commenting on posts');
+            } else {
+                console.error('Not enough posts to comment');
+            }
+        }
+        
+        commentNextPost();
+    }
+
+    setTimeout(() => {
+        LikePosts();
+    }, 5000); // Initial wait for 5 seconds
 }
